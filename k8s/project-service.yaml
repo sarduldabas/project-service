@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: project-service
+  namespace: deckpilot
+  labels:
+    app: project-service
+    part-of: deckpilot
+spec:
+  replicas: 1   # owns the in-process workflow runner, so keep one replica (see README)
+  selector:
+    matchLabels:
+      app: project-service
+  template:
+    metadata:
+      labels:
+        app: project-service
+        part-of: deckpilot
+    spec:
+      containers:
+        - name: project-service
+          image: deckpilot/project-service:1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: deckpilot-config
+            - secretRef:
+                name: postgres-secret
+          readinessProbe:
+            httpGet: { path: /ready, port: 8000 }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: 8000 }
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: project-service
+  namespace: deckpilot
+  labels:
+    app: project-service
+    part-of: deckpilot
+spec:
+  type: ClusterIP
+  selector:
+    app: project-service
+  ports:
+    - port: 8000
+      targetPort: 8000
